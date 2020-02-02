@@ -47,10 +47,10 @@ It works even in free version of RemoteXY Android app, because contains less tha
 ![UI in designer](docs/RemoteXYUI.PNG)
 
 ## Models
-Please see them in [models folder](ForestLamp/models). 
+Please see them in [models folder](models). 
 
 ## Building photos
-Please see them in [models folder](ForestLamp/docs). 
+Please see them in [docs folder](docs). 
 
 ## TODO
 * Add more photos
