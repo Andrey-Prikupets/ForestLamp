@@ -496,6 +496,22 @@ void setup()
 }
 
 void writeRemoteXY() {
+  bool _lastModeRemoteXY = (bool)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_ENABLE);
+  bool _luz = (bool)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_LUZ);
+  uint8_t _color_r = (uint8_t)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_R);
+  uint8_t _color_g = (uint8_t)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_G);
+  uint8_t _color_b = (uint8_t)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_B);
+  int8_t _direction_x = (int8_t)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_X);
+  int8_t _direction_y = (int8_t)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_Y);
+
+  if (_lastModeRemoteXY != lastModeRemoteXY) LOG.println(PSTR("lastModeRemoteXY is different"));
+  if (_luz != RemoteXY.luz) LOG.println(PSTR("luz is different"));
+  if (_color_r != RemoteXY.color_r) LOG.println(PSTR("color_r is different"));
+  if (_color_g != RemoteXY.color_g) LOG.println(PSTR("color_g is different"));
+  if (_color_b != RemoteXY.color_b) LOG.println(PSTR("color_b is different"));
+  if (_direction_x != RemoteXY.direction_x) LOG.println(PSTR("direction_x is different"));
+  if (_direction_y != RemoteXY.direction_y) LOG.println(PSTR("direction_y is different"));
+  
   EEPROM.write(EEPROM_REMOTEXY_ADDRESS_ENABLE, lastModeRemoteXY);
   EEPROM.write(EEPROM_REMOTEXY_ADDRESS_LUZ, RemoteXY.luz);
   EEPROM.write(EEPROM_REMOTEXY_ADDRESS_R, RemoteXY.color_r);
@@ -526,7 +542,56 @@ void dumpRemoteXY(bool justSwitched) {
   }
 }
 
+//#define DEBUG_CIRCLE
+//#define DEBUG_COLORS
+
+CHSV rgb2hsv(CRGB in)
+{
+    int h, s, v;
+    int min, max, delta;
+
+    min = in.r < in.g ? in.r : in.g;
+    min = min  < in.b ? min  : in.b;
+
+    max = in.r > in.g ? in.r : in.g;
+    max = max  > in.b ? max  : in.b;
+
+    v = max;                                // v
+    delta = max - min;
+    if (delta < 0.001)
+    {
+        return CHSV(0,0,v);
+    }
+    if( max > 0 ) { // NOTE: if Max is == 0, this divide would cause a crash
+        s = round(255.0*delta / max);                  // s
+    } else {
+        // if max is 0, then r = g = b = 0              
+        // s = 0, h is undefined
+        return CHSV(0,0,v);
+    }
+    double h1;
+    if( in.r >= max )                           // > is bogus, just keeps compilor happy
+        h1 = ((float) ( in.g - in.b )) / delta;        // between yellow & magenta
+    else
+    if( in.g >= max )
+        h1 = 2.0 + ( (float)(in.b - in.r)) / delta;  // between cyan & yellow
+    else
+        h1 = 4.0 + ( (float)( in.r - in.g )) / delta;  // between magenta & cyan
+
+    h1 *= 60.0;                              // degrees
+
+    if( h1 < 0.0 )
+        h1 += 360.0;
+
+    return CHSV((uint8_t) round((h1/360.0)*255.0),s,v);
+}
+
 void handleRemoteXY() {
+  static bool oldConnectFlag = false;
+  if (!oldConnectFlag && RemoteXY.connect_flag) {
+    LOG.println(PSTR("RemoteXY connected."));
+  }
+
   bool justSwitched = false;
   if (RemoteXY.connect_flag && !lastModeRemoteXY) {
     LOG.println(PSTR("Switching to RemoteXY control..."));
@@ -540,7 +605,6 @@ void handleRemoteXY() {
     RemoteXY.direction_y = 0;
   }
 
-  static bool oldConnectFlag = false;
   if (oldConnectFlag && !RemoteXY.connect_flag) {
     LOG.println(PSTR("RemoteXY disconnected."));
   }
@@ -559,32 +623,38 @@ void handleRemoteXY() {
 
   FastLED.clear();
   if (RemoteXY.luz) {
+    CHSV baseColor = rgb2hsv(CRGB(RemoteXY.color_r, RemoteXY.color_g, RemoteXY.color_b)); // rgb2hsv_approximate
+#ifdef DEBUG_COLORS
+    if (debounced) LOG.printf_P(PSTR("RGB=%d,%d,%d HSV=%d,%d,%d\n"), 
+      RemoteXY.color_r, RemoteXY.color_g, RemoteXY.color_b, baseColor.hue, baseColor.saturation, baseColor.value);      
+#endif    
     FastLED.setBrightness(255);
     float alpha = 0;
     float r = min(sqrt(sq(RemoteXY.direction_y)+sq(RemoteXY.direction_x))/100.0, 1.0);
     if (RemoteXY.direction_y != 0 || RemoteXY.direction_x != 0)
       alpha = atan2(RemoteXY.direction_y, RemoteXY.direction_x);
-    if (debounced) LOG.printf_P(PSTR("alpha=%f, r=%f, x=%d, y=%d\n"), alpha*RAD_TO_DEG, r, RemoteXY.direction_x, RemoteXY.direction_y);      
+#ifdef DEBUG_CIRCLE      
+    if (debounced) LOG.printf_P(PSTR("alpha=%4.0f, r=%4.2f, x=%d, y=%d\n"), alpha*RAD_TO_DEG, r, RemoteXY.direction_x, RemoteXY.direction_y);      
+#endif        
     for (uint8_t x=0; x < WIDTH; x++) {
       float beta = float(x)/WIDTH*2.0*PI;
       float delta = fabs(alpha-beta);
-      float effAngle = (delta-HALF_PI)*r;
-      float brightness = max(cos(effAngle), 0.0);
-      if (debounced) LOG.printf_P(PSTR("x=%d, beta=%f/%f, delta=%f/%f, eff=%f/%f, brightness=%f\n"), x, beta, beta*RAD_TO_DEG, delta, delta*RAD_TO_DEG, effAngle, effAngle*RAD_TO_DEG, brightness);      
+      float effAngle = (delta-3.0*HALF_PI/2.0); // geometric shift because 1st LEDs is no in angle zero;
+      if (effAngle > PI) effAngle -= TWO_PI;
+      if (effAngle < -PI) effAngle += TWO_PI;
+      float effAngleR = effAngle*r;
+      float brightness = max(cos(effAngleR), 0.0);
+#ifdef DEBUG_CIRCLE      
+      if (debounced) LOG.printf_P(PSTR("x=%d, beta=%3.1f/%3.0f, delta=%3.1f/%3.0f, eff=%4.1f/%4.0f, effR=%4.1f/%4.0f, brightness=%4.2f\n"), 
+        x, beta, beta*RAD_TO_DEG, delta, delta*RAD_TO_DEG, effAngle, effAngle*RAD_TO_DEG, effAngleR, effAngleR*RAD_TO_DEG, brightness);
+#endif        
       for (uint8_t y=0; y < HEIGHT; y++) {
-        CHSV color = rgb2hsv_approximate(CRGB(RemoteXY.color_r, RemoteXY.color_g, RemoteXY.color_b));
+        CHSV color = baseColor;
         color.value = (uint8_t) round(color.value*brightness);
         CRGB adjustedColor = color;
         drawPixelXY(x, y, adjustedColor);
       }
     }
-/*
-    for (uint8_t x=0; x < WIDTH; x++) {
-      for (uint8_t y=0; y < HEIGHT; y++) {
-        drawPixelXY(x, y, x == 0 ? CRGB::Red : CRGB::Black);
-      }
-    }
- */ 
   }
   FastLED.show();  
 }
@@ -595,7 +665,7 @@ void handleLedLamp() {
 
   if (lastModeRemoteXY) {
     ONflag = RemoteXY.luz;
-    CHSV hsvColor = rgb2hsv_approximate(CRGB(RemoteXY.color_r, RemoteXY.color_g, RemoteXY.color_b));
+    CHSV hsvColor = rgb2hsv(CRGB(RemoteXY.color_r, RemoteXY.color_g, RemoteXY.color_b)); // rgb2hsv_approximate
     currentMode = EFF_COLOR;
     modes[EFF_COLOR].Scale = hsvColor.h/2.5;
     modes[currentMode].Brightness = hsvColor.v; /// max(RemoteXY.color_r, max(RemoteXY.color_g, RemoteXY.color_b)); 
