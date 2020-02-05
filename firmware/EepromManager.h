@@ -46,15 +46,15 @@
  * 90-92     3        режим №24: яркость, скорость, масштаб (по одному байту)
  * 93-95     3        режим №25: яркость, скорость, масштаб (по одному байту)
  *
- * 111-141   31       настройки режима избранных эффектов (вкл/выкл - 1 байт; интервал - 2 байта; разброс - 2 байта; инициализировать вкл/выкл - 1 байт; вкл/выкл каждого эффекта - 25 (MODE_AMOUNT) байт; вкл/выкл не хранится в EEPROM)
+ * 111-142   31       настройки режима избранных эффектов (вкл/выкл - 1 байт; интервал - 2 байта; разброс - 2 байта; инициализировать вкл/выкл - 1 байт; вкл/выкл каждого эффекта - 25 (MODE_AMOUNT) байт; вкл/выкл не хранится в EEPROM)
  * 
- * 142       1        RemoteXY - enabled;
- * 143       1        RemoteXY - luz
- * 144       1        RemoteXY - r
- * 145       1        RemoteXY - g
- * 146       1        RemoteXY - b
- * 147       1        RemoteXY - x
- * 148       1        RemoteXY - y
+ * 143       1        RemoteXY - enabled;
+ * 144       1        RemoteXY - luz
+ * 145       1        RemoteXY - r
+ * 146       1        RemoteXY - g
+ * 147       1        RemoteXY - b
+ * 148       1        RemoteXY - x
+ * 149       1        RemoteXY - y
  * 
  * 195       1        признак "кнопка разблокирована"
  * 196       1        рабочий режим лампы (ESP_MODE)
@@ -65,7 +65,7 @@
  *
  * Не используются адреса:
  * 96-110    15       резерв, можно добавить ещё 5 эффектов
- * 149-194   53       если добавить ещё 5 эффектов, начальный адрес неиспользуемой памяти сдвинется с 142 на 147
+ * 150-194   53       если добавить ещё 5 эффектов, начальный адрес неиспользуемой памяти сдвинется с 142 на 147
 */
 
 #include <EEPROM.h>
@@ -87,7 +87,7 @@
 #define EEPROM_FIRST_RUN_MARK                (24U)          // счисло-метка, если ещё не записно в EEPROM_FIRST_RUN_ADDRESS, значит нужно проинициализировать EEPROM и записать все первоначальные настройки
 #define EEPROM_WRITE_DELAY                   (30000UL)      // отсрочка записи в EEPROM после последнего изменения хранимых настроек, позволяет уменьшить количество операций записи в EEPROM
 
-#define EEPROM_REMOTEXY_ADDRESS 142
+#define EEPROM_REMOTEXY_ADDRESS 143
 #define EEPROM_REMOTEXY_ADDRESS_ENABLE        (EEPROM_REMOTEXY_ADDRESS + 0)
 #define EEPROM_REMOTEXY_ADDRESS_LUZ           (EEPROM_REMOTEXY_ADDRESS + 1)
 #define EEPROM_REMOTEXY_ADDRESS_R             (EEPROM_REMOTEXY_ADDRESS + 2)
@@ -131,10 +131,10 @@ class EepromManager
         EEPROM.write(EEPROM_ESP_BUTTON_ENABLED_ADDRESS, 1);
 
         EEPROM.write(EEPROM_REMOTEXY_ADDRESS_ENABLE, 0);
-        EEPROM.write(EEPROM_REMOTEXY_ADDRESS_LUZ, 0);
-        EEPROM.write(EEPROM_REMOTEXY_ADDRESS_R, 0);
-        EEPROM.write(EEPROM_REMOTEXY_ADDRESS_G, 0);
-        EEPROM.write(EEPROM_REMOTEXY_ADDRESS_B, 0);
+        EEPROM.write(EEPROM_REMOTEXY_ADDRESS_LUZ, 1);
+        EEPROM.write(EEPROM_REMOTEXY_ADDRESS_R, 255);
+        EEPROM.write(EEPROM_REMOTEXY_ADDRESS_G, 128);
+        EEPROM.write(EEPROM_REMOTEXY_ADDRESS_B, 255);
         EEPROM.write(EEPROM_REMOTEXY_ADDRESS_X, 0);
         EEPROM.write(EEPROM_REMOTEXY_ADDRESS_Y, 0);
 
@@ -170,7 +170,9 @@ class EepromManager
 
     static void SaveModesSettings(int8_t* currentMode, ModeType modes[])
     {
-      EEPROM.put(EEPROM_MODES_START_ADDRESS + EEPROM_MODE_STRUCT_SIZE * (*currentMode), modes[*currentMode]);
+      int address = EEPROM_MODES_START_ADDRESS + EEPROM_MODE_STRUCT_SIZE * (*currentMode);
+      LOG.printf_P(PSTR("SaveModesSettings, start=%d, size=%d\n"), address, sizeof(ModeType));      
+      EEPROM.put(address, modes[*currentMode]);
       EEPROM.commit();
     }
     
@@ -189,12 +191,17 @@ class EepromManager
         }
         saveFavoritesSettings();
         EEPROM.commit();
+
+        bool _lastModeRemoteXY = (bool)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_ENABLE);
+        LOG.printf_P(PSTR("CHECK in Tick: lastModeRemoteXY %d\n"), _lastModeRemoteXY);
       }
     }
 
     static void SaveAlarmsSettings(uint8_t* alarmNumber, AlarmType alarms[])
     {
-      EEPROM.write(EEPROM_ALARM_START_ADDRESS + EEPROM_ALARM_STRUCT_SIZE * (*alarmNumber), alarms[*alarmNumber].State);
+      int address = EEPROM_ALARM_START_ADDRESS + EEPROM_ALARM_STRUCT_SIZE * (*alarmNumber);
+      LOG.printf_P(PSTR("SaveAlarmsSettings, start=%d\n"), address);      
+      EEPROM.write(address, alarms[*alarmNumber].State);
       WriteUint16(EEPROM_ALARM_START_ADDRESS + EEPROM_ALARM_STRUCT_SIZE * (*alarmNumber) + 1, alarms[*alarmNumber].Time);
       EEPROM.commit();
     }
@@ -234,6 +241,7 @@ class EepromManager
 
     static void WriteUint16(uint16_t address, uint16_t val)
     {
+      LOG.printf_P(PSTR("WriteUint16 %d:%d\n"), address, val);      
       uint8_t* p = (uint8_t*)&val;
       EEPROM.write(address, *p);
       EEPROM.write(address + 1, *(p + 1));
@@ -251,6 +259,7 @@ class EepromManager
 
     static void WriteInt16(uint16_t address, int16_t val)
     {
+      LOG.printf_P(PSTR("WriteInt16 %d:%d\n"), address, val);      
       uint8_t* p = (uint8_t*)&val;
       EEPROM.write(address, *p);
       EEPROM.write(address + 1, *(p + 1));
@@ -270,6 +279,7 @@ class EepromManager
 
     static void WriteUint32(uint16_t address, uint32_t val)
     {
+      LOG.printf_P(PSTR("WriteUint32 %d:%d\n"), address, val);      
       uint8_t* p = (uint8_t*)&val;
       EEPROM.write(address, *p);
       EEPROM.write(address + 1, *(p + 1));
@@ -291,6 +301,7 @@ class EepromManager
 
     static void WriteInt32(uint16_t address, int32_t val)
     {
+      LOG.printf_P(PSTR("WriteInt32 %d:%d\n"), address, val);      
       uint8_t* p = (uint8_t*)&val;
       EEPROM.write(address, *p);
       EEPROM.write(address + 1, *(p + 1));

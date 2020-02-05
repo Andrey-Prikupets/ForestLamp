@@ -276,7 +276,8 @@ void setup()
 {
   Serial.begin(115200);
   Serial.println();
-  ///ESP.wdtEnable(WDTO_8S); // AP; Removed WDT because it triggers sometimes without reason;
+  
+  ESP.wdtEnable(WDTO_8S);
 
 
   // ПИНЫ
@@ -504,13 +505,13 @@ void writeRemoteXY() {
   int8_t _direction_x = (int8_t)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_X);
   int8_t _direction_y = (int8_t)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_Y);
 
-  if (_lastModeRemoteXY != lastModeRemoteXY) LOG.println(PSTR("lastModeRemoteXY is different"));
-  if (_luz != RemoteXY.luz) LOG.println(PSTR("luz is different"));
-  if (_color_r != RemoteXY.color_r) LOG.println(PSTR("color_r is different"));
-  if (_color_g != RemoteXY.color_g) LOG.println(PSTR("color_g is different"));
-  if (_color_b != RemoteXY.color_b) LOG.println(PSTR("color_b is different"));
-  if (_direction_x != RemoteXY.direction_x) LOG.println(PSTR("direction_x is different"));
-  if (_direction_y != RemoteXY.direction_y) LOG.println(PSTR("direction_y is different"));
+  if (_lastModeRemoteXY != lastModeRemoteXY) LOG.printf_P(PSTR("WRITE: lastModeRemoteXY is different, old=%d, new=%d\n"), _lastModeRemoteXY, lastModeRemoteXY);
+  if (_luz != RemoteXY.luz) LOG.println(PSTR("WRITE: luz is different"));
+  if (_color_r != RemoteXY.color_r) LOG.println(PSTR("WRITE: color_r is different"));
+  if (_color_g != RemoteXY.color_g) LOG.println(PSTR("WRITE: color_g is different"));
+  if (_color_b != RemoteXY.color_b) LOG.println(PSTR("WRITE: color_b is different"));
+  if (_direction_x != RemoteXY.direction_x) LOG.println(PSTR("WRITE: direction_x is different"));
+  if (_direction_y != RemoteXY.direction_y) LOG.println(PSTR("WRITE: direction_y is different"));
   
   EEPROM.write(EEPROM_REMOTEXY_ADDRESS_ENABLE, lastModeRemoteXY);
   EEPROM.write(EEPROM_REMOTEXY_ADDRESS_LUZ, RemoteXY.luz);
@@ -519,7 +520,11 @@ void writeRemoteXY() {
   EEPROM.write(EEPROM_REMOTEXY_ADDRESS_B, RemoteXY.color_b);
   EEPROM.write(EEPROM_REMOTEXY_ADDRESS_X, (uint8_t) RemoteXY.direction_x);
   EEPROM.write(EEPROM_REMOTEXY_ADDRESS_Y, (uint8_t) RemoteXY.direction_y);
-  EEPROM.commit();
+  if (!EEPROM.commit())
+    LOG.println(PSTR("WRITE ERROR"));
+
+  _lastModeRemoteXY = (bool)EEPROM.read(EEPROM_REMOTEXY_ADDRESS_ENABLE);
+  if (_lastModeRemoteXY != lastModeRemoteXY) LOG.printf_P(PSTR("CHECK: wrong lastModeRemoteXY %d\n"), _lastModeRemoteXY);
 }
 
 void dumpRemoteXY(bool justSwitched) {

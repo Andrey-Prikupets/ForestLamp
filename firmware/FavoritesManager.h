@@ -125,14 +125,18 @@ class FavoritesManager
 
     static void SaveFavoritesToEeprom()
     {
+      LOG.printf_P(PSTR("SaveFavoritesToEeprom, start=%d\n"), EEPROM_FAVORITES_START_ADDRESS);            
       EEPROM.put(EEPROM_FAVORITES_START_ADDRESS, FavoritesRunning);
       EepromManager::WriteUint16(EEPROM_FAVORITES_START_ADDRESS + 1, Interval);
       EepromManager::WriteUint16(EEPROM_FAVORITES_START_ADDRESS + 3, Dispersion);
+      ///LOG.printf_P(PSTR("SaveFavoritesToEeprom2, start=%d\n"), EEPROM_FAVORITES_START_ADDRESS+5);            
       EEPROM.put(EEPROM_FAVORITES_START_ADDRESS + 5, UseSavedFavoritesRunning);
 
       for (uint8_t i = 0; i < MODE_AMOUNT; i++)
       {
-        EEPROM.put(EEPROM_FAVORITES_START_ADDRESS + i + 6, FavoriteModes[i] > 0 ? 1 : 0);
+        int address = EEPROM_FAVORITES_START_ADDRESS + i + 6;
+        ///LOG.printf_P(PSTR("SaveFavoritesToEeprom3, start=%d\n"), address); 
+        EEPROM.put(address, (uint8_t)(FavoriteModes[i] > 0 ? 1 : 0));
       }
 
       EEPROM.commit();
