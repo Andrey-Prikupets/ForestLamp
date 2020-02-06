@@ -16,6 +16,8 @@ I made few additional models and did not use light core.
 
 The idea is to disassemble the lamp with only 1 nut.
 
+Models are uploaded to **Thingiverse** [https://www.thingiverse.com/thing:4147654](https://www.thingiverse.com/thing:4147654) :gem:.
+
 ## Additional features exposed via RemoteXY app
 
 * Simplified color selection, brightness control and grayscale;
@@ -55,5 +57,4 @@ Please see them in [docs folder](docs).
 ## TODO
 * Add more photos
 * Add videos
-* Add 3D models to Thingiverse;
 * Re-enable WDT;
