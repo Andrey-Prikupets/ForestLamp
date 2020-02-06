@@ -5,6 +5,8 @@ The lamp itself is 3D printed as 75% more resized version of that ["resized" mod
 ESP8266 board (I used WeMos D1 mini) runs modified AlexGyver's firmware, where I made some configuration changes, tweaks for stability and flickering removal.
 Also I added additional features which are controlled via RemoteXY Android app.
 
+![View](docs/View.jpg)
+
 ## 3D model changes
 
 I made few additional models and did not use light core. 
