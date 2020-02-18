@@ -40,11 +40,22 @@ bool loadingFlag = true;
 unsigned char matrixValue[8][16];
 
 // Scale in range 1..100;
-#define FIRE_SCALE        50
-#define RAINBOW_HOR_SCALE 50
-#define RAINBOW_VER_SCALE 50
-#define RAINBOW_DIAG_SCALE 50
+// Delay in ms;
+#define FIRE_SCALE        10 // yellow fire;
+#define FIRE_DELAY        10
+
+#define RAINBOW_VER_SCALE 25 // 10
+#define RAINBOW_VER_DELAY 100
+
+#define RAINBOW_HOR_SCALE 10
+#define RAINBOW_HOR_DELAY 100
+
+#define RAINBOW_DIAG_SCALE 40
+#define RAINBOW_DIAG_DELAY 100
+
 #define MATRIX_SCALE      50
+#define MATRIX_DELAY      100
+
 static const uint8_t maxDim = max(WIDTH, HEIGHT);
 
 // START; Effects from FastLed's DemoReel;
@@ -239,7 +250,7 @@ static const uint8_t hueMask[8][16] PROGMEM =
   {0 , 0 , 0 , 1 , 1 , 0 , 0 , 0 , 0 , 0 , 0 , 1 , 1 , 0 , 0 , 0 }
 };
 
-void fireRoutine(bool isColored)                            // true - цветной огонь, false - белый
+void fireRoutine()
 {
   if (loadingFlag)
   {
@@ -248,14 +259,16 @@ void fireRoutine(bool isColored)                            // true - цветн
     generateLine();
     memset(matrixValue, 0, sizeof(matrixValue));
   }
-  if (pcnt >= 100)
-  {
-    shiftUp();
-    generateLine();
-    pcnt = 0;
+  EVERY_N_MILLISECONDS( FIRE_DELAY ) {
+    if (pcnt >= 100)
+    {
+      shiftUp();
+      generateLine();
+      pcnt = 0;
+    }
+    drawFrame(pcnt, true);
+    pcnt += 30;
   }
-  drawFrame(pcnt, isColored);
-  pcnt += 30;
 }
 
 // Randomly generate the next line (matrix row)
@@ -354,13 +367,15 @@ void drawFrame(uint8_t pcnt, bool isColored)
 
 void rainbowVerticalRoutine()
 {
-  hue += 4;
-  for (uint8_t j = 0; j < HEIGHT; j++)
-  {
-    CHSV thisColor = CHSV((uint8_t)(hue + j * RAINBOW_VER_SCALE), 255, 255);
-    for (uint8_t i = 0U; i < WIDTH; i++)
+  EVERY_N_MILLISECONDS( RAINBOW_VER_DELAY ) {
+    hue += 4;
+    for (uint8_t j = 0; j < HEIGHT; j++)
     {
-      drawPixelXY(i, j, thisColor);
+      CHSV thisColor = CHSV((uint8_t)(hue + j * RAINBOW_VER_SCALE), 255, 255);
+      for (uint8_t i = 0U; i < WIDTH; i++)
+      {
+        drawPixelXY(i, j, thisColor);
+      }
     }
   }
 }
@@ -368,13 +383,15 @@ void rainbowVerticalRoutine()
 // ------------- радуга горизонтальная ----------------
 void rainbowHorizontalRoutine()
 {
-  hue += 4;
-  for (uint8_t i = 0U; i < WIDTH; i++)
-  {
-    CHSV thisColor = CHSV((uint8_t)(hue + i * RAINBOW_HOR_SCALE), 255, 255);
-    for (uint8_t j = 0U; j < HEIGHT; j++)
+  EVERY_N_MILLISECONDS( RAINBOW_HOR_DELAY ) {
+    hue += 4;
+    for (uint8_t i = 0U; i < WIDTH; i++)
     {
-      drawPixelXY(i, j, thisColor);
+      CHSV thisColor = CHSV((uint8_t)(hue + i * RAINBOW_HOR_SCALE), 255, 255);
+      for (uint8_t j = 0U; j < HEIGHT; j++)
+      {
+        drawPixelXY(i, j, thisColor);
+      }
     }
   }
 }
@@ -388,29 +405,16 @@ void rainbowDiagonalRoutine()
     FastLED.clear();
   }
 
-  hue += 8;
-  for (uint8_t i = 0U; i < WIDTH; i++)
-  {
-    for (uint8_t j = 0U; j < HEIGHT; j++)
+  EVERY_N_MILLISECONDS( RAINBOW_DIAG_DELAY ) {
+    hue += 8;
+    for (uint8_t i = 0U; i < WIDTH; i++)
     {
-      float twirlFactor = 3.0F * (RAINBOW_DIAG_SCALE / 100.0F);      // на сколько оборотов будет закручена матрица, [0..3]
-      CRGB thisColor = CHSV((uint8_t)(hue + (float)(WIDTH / HEIGHT * i + j * twirlFactor) * (float)(255 / maxDim)), 255, 255);
-      drawPixelXY(i, j, thisColor);
-    }
-  }
-}
-
-// ------------- цвет ------------------
-void colorRoutine()
-{
-  if (loadingFlag)
-  {
-    loadingFlag = false;
-    FastLED.clear();
-
-    for (int16_t i = 0U; i < NUM_LEDS; i++)
-    {
-      leds[i] = CHSV(gHue, 255U, 255U);
+      for (uint8_t j = 0U; j < HEIGHT; j++)
+      {
+        float twirlFactor = 3.0F * (RAINBOW_DIAG_SCALE / 100.0F);      // на сколько оборотов будет закручена матрица, [0..3]
+        CRGB thisColor = CHSV((uint8_t)(hue + (float)(WIDTH / HEIGHT * i + j * twirlFactor) * (float)(255 / maxDim)), 255, 255);
+        drawPixelXY(i, j, thisColor);
+      }
     }
   }
 }
@@ -418,39 +422,36 @@ void colorRoutine()
 // ------------- матрица ---------------
 void matrixRoutine()
 {
-  for (uint8_t x = 0U; x < WIDTH; x++)
+  if (loadingFlag)
   {
-    // заполняем случайно верхнюю строку
-    uint32_t thisColor = getPixColorXY(x, HEIGHT - 1U);
-    if (thisColor == 0U)
-      drawPixelXY(x, HEIGHT - 1U, 0x00FF00 * (random(0, 100 - MATRIX_SCALE) == 0U));
-    else if (thisColor < 0x002000)
-      drawPixelXY(x, HEIGHT - 1U, 0U);
-    else
-      drawPixelXY(x, HEIGHT - 1U, thisColor - 0x002000);
+    loadingFlag = false;
+    FastLED.clear();
   }
-
-  // сдвигаем всё вниз
-  for (uint8_t x = 0U; x < WIDTH; x++)
-  {
-    for (uint8_t y = 0U; y < HEIGHT - 1U; y++)
+  EVERY_N_MILLISECONDS( MATRIX_DELAY ) {
+    for (uint8_t x = 0U; x < WIDTH; x++)
     {
-      drawPixelXY(x, y, getPixColorXY(x, y + 1U));
+      // заполняем случайно верхнюю строку
+      uint32_t thisColor = getPixColorXY(x, HEIGHT - 1U);
+      if (thisColor == 0U)
+        drawPixelXY(x, HEIGHT - 1U, 0x00FF00 * (random(0, 100 - MATRIX_SCALE) == 0U));
+      else if (thisColor < 0x002000)
+        drawPixelXY(x, HEIGHT - 1U, 0U);
+      else
+        drawPixelXY(x, HEIGHT - 1U, thisColor - 0x002000);
+    }
+  
+    // сдвигаем всё вниз
+    for (uint8_t x = 0U; x < WIDTH; x++)
+    {
+      for (uint8_t y = 0U; y < HEIGHT - 1U; y++)
+      {
+        drawPixelXY(x, y, getPixColorXY(x, y + 1U));
+      }
     }
   }
 }
 
 // END; Effects from AlexGyver's WiFi Lamp;
-
-// List of patterns to cycle through.  Each is defined as a separate function below.
-typedef void (*SimplePatternList[])();
-SimplePatternList gPatterns = { 
-  rainbow,            
-  rainbowWithGlitter, 
-  confetti,            
-  sinelon,             
-  juggle,              
-  bpm };              
 
 int readings[NUM_READINGS];     // the readings from the analog input
 
@@ -530,27 +531,27 @@ int getValue() {
   return value;  
 }
 
-// 0  off;
-// 1  white;
-// 2,3 - colors;
-//  rainbow
-//  confetti
-//  sinelon
-//  juggle
-//  bpm
-// fireRoutine;
-// rainbowVerticalRoutine
-// rainbowHorizontalRoutine;
-// rainbowDiagonalRoutine;
-// colorsRoutine;
-// matrixRoutine;
-// demo of all modes;
+// List of patterns to cycle through.  Each is defined as a separate function below.
+typedef void (*SimplePatternList[])();
+//   rainbow,            
+//   juggle,              
+//   rainbowWithGlitter, 
+//   bpm,
+SimplePatternList gPatterns = { 
+   confetti,            
+   sinelon,             
+   fireRoutine,
+   rainbowVerticalRoutine,
+   rainbowHorizontalRoutine,
+   rainbowDiagonalRoutine,
+   matrixRoutine
+  };              
 
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
 #define POT_MAX ADC_MAX
 #define POT_WHITE_MIN 0
-#define POT_WHITE_MAX 10
+#define POT_WHITE_MAX 15
 #define POT_COLORS_MIN POT_WHITE_MAX+1
 #define POT_COLORS_MAX (POT_MAX/4)
 #define EFFECTS_MIN (POT_COLORS_MAX+1)
