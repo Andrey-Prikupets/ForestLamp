@@ -26,7 +26,7 @@ FASTLED_USING_NAMESPACE
 #define NUM_LEDS              (uint16_t)(WIDTH * HEIGHT)
 CRGB leds[NUM_LEDS];
 
-#define BRIGHTNESS          25 // 0-255
+#define BRIGHTNESS         255 // 0-255
 #define FRAMES_PER_SECOND  120
 
 #define NUM_READINGS          (10)
@@ -50,8 +50,8 @@ unsigned char matrixValue[8][16];
 #define RAINBOW_HOR_SCALE 10
 #define RAINBOW_HOR_DELAY 100
 
-#define RAINBOW_DIAG_SCALE 40
-#define RAINBOW_DIAG_DELAY 100
+#define RAINBOW_DIAG_SCALE 15
+#define RAINBOW_DIAG_DELAY 80
 
 #define MATRIX_SCALE      50
 #define MATRIX_DELAY      100
@@ -412,7 +412,8 @@ void rainbowDiagonalRoutine()
       for (uint8_t j = 0U; j < HEIGHT; j++)
       {
         float twirlFactor = 3.0F * (RAINBOW_DIAG_SCALE / 100.0F);      // на сколько оборотов будет закручена матрица, [0..3]
-        CRGB thisColor = CHSV((uint8_t)(hue + (float)(WIDTH / HEIGHT * i + j * twirlFactor) * (float)(255 / maxDim)), 255, 255);
+        uint8_t hue1 = (uint8_t)(hue + ((float)WIDTH / (float)HEIGHT * i + j * twirlFactor) * (float)(255 / maxDim));
+        CRGB thisColor = CHSV(hue1, 255, 255);
         drawPixelXY(i, j, thisColor);
       }
     }
@@ -477,6 +478,8 @@ void setup() {
   loadingFlag = true;
 }
 
+static int rawValue = 0;
+
 int getValueAvg() {
   static int readIndex = 0;              // the index of the current reading
   static int total = 0;                  // the running total
@@ -484,7 +487,8 @@ int getValueAvg() {
   // subtract the last reading:
   total = total - readings[readIndex];
   // read from the sensor:
-  readings[readIndex] = analogRead(POT_PIN);
+  rawValue = analogRead(POT_PIN);
+  readings[readIndex] = rawValue;
   // add the reading to the total:
   total = total + readings[readIndex];
   // advance to the next position in the array:
@@ -500,32 +504,14 @@ int getValueAvg() {
   return total / NUM_READINGS;
 }
 
-#define HIST 3
-
-int getValueHist() {
-  static int prevValue = -1;
-  int value = getValueAvg();
-  if (prevValue < 0) {
-    prevValue = value;
-    return value;
-  }
-  int delta = value-prevValue;
-  if (delta < 0)  
-    delta = -delta;
-  if (delta <= HIST)
-    return prevValue;
-  value = (prevValue+value)/2;
-  prevValue = value;
-  return value; 
-}
-
 #define ADC_MAX 1023
 
 int getValue() {
-  int value = ADC_MAX-getValueHist();
+  int value = ADC_MAX-getValueAvg();
   static int value1 = -1;
   if (value != value1) {
-    Serial.print("value="); Serial.println(value,DEC);
+//    Serial.print("value="); Serial.print(value,DEC);
+//    Serial.print(", rawValue="); Serial.println(rawValue,DEC);
     value1 = value;
   }
   return value;  
@@ -551,16 +537,18 @@ SimplePatternList gPatterns = {
 
 #define POT_MAX ADC_MAX
 #define POT_WHITE_MIN 0
-#define POT_WHITE_MAX 15
+#define POT_WHITE_MAX 40
 #define POT_COLORS_MIN POT_WHITE_MAX+1
 #define POT_COLORS_MAX (POT_MAX/4)
 #define EFFECTS_MIN (POT_COLORS_MAX+1)
-#define EFFECTS_MAX (POT_MAX-10)
+#define EFFECTS_MAX (POT_MAX-40)
 #define DEMO_MIN (EFFECTS_MAX+1)
 #define DEMO_MAX POT_MAX
 #define EFFECTS_RANGE (EFFECTS_MAX-EFFECTS_MIN+1)
 #define EFFECTS_NUM ARRAY_SIZE(gPatterns)
 #define EFFECTS_STEP (EFFECTS_RANGE/EFFECTS_NUM)
+
+#define HIST_STEP ((EFFECTS_STEP+7)/8)
 
 void nextPattern()
 {
@@ -576,8 +564,29 @@ void setAllLeds(CHSV color) {
   }  
 }
 
-inline bool inRange(int value, int minValue, int maxValue) {
+bool inRange1(int value, int minValue, int maxValue) {
   return value >= minValue && value <= maxValue;
+}
+
+bool inRange(int value, int minValue, int maxValue) {
+  static int prevValue = -1;
+  bool prevValueInRange = inRange1(prevValue, minValue, maxValue);
+  bool fit;
+//  Serial.print(F("prevValueInRange=")); Serial.print(prevValueInRange, DEC);
+  if (prevValueInRange) {
+//    Serial.print(F(", step=")); Serial.print(HIST_STEP, DEC);
+    fit = inRange1(value, minValue-HIST_STEP, maxValue+HIST_STEP);
+  } else {
+    fit = inRange1(value, minValue+HIST_STEP, maxValue-HIST_STEP);    
+  }
+  if (fit) {
+    prevValue = (maxValue+minValue)/2;
+  }
+//  Serial.print(F(" [")); Serial.print(minValue, DEC);
+//  Serial.print(F(",")); Serial.print(maxValue, DEC);
+//  Serial.print(F("], value=")); Serial.print(value, DEC);
+//  Serial.print(F(", fit=")); Serial.println(fit, DEC);
+  return fit;
 }
 
 bool isSwitched(int pos) {
@@ -600,7 +609,7 @@ void loop()
     FastLED.show();  
     return;
   }
-  
+
   int value = getValue();
   if (inRange(value, POT_WHITE_MIN, POT_WHITE_MAX)) {
     isSwitched(POT_WHITE_MIN);
