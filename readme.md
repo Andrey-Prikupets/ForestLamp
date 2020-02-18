@@ -56,7 +56,16 @@ Please see them in [models folder](models).
 ## Building photos
 Please see them in [docs folder](docs). 
 
+## Internet enabled firmware
+
+Primary firmware is in [firmware/ForestLamp](firmware/ForestLamp) folder.
+
+## Alternative firmware without Internet control
+
+If internet control is not needed, there is an alternative firmware based on Arduino 328p. Effects are changed by pot (variable resistor).
+Please see it in [firmware/ForestLampNI](firmware/ForestLampNI) folder.
+
+
 ## TODO
-* Add more photos
 * Add videos
 * Re-enable WDT;
