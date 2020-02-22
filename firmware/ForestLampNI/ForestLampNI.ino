@@ -513,6 +513,8 @@ int getValue() {
 //    Serial.print("value="); Serial.print(value,DEC);
 //    Serial.print(", rawValue="); Serial.println(rawValue,DEC);
     value1 = value;
+  } else {
+//    Serial.print("rawValue="); Serial.println(rawValue,DEC);  
   }
   return value;  
 }
@@ -535,8 +537,13 @@ SimplePatternList gPatterns = {
 
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
+#define SAFE_LIMIT 100 // dirty hack to handle out of range values;
+#define POT_MIN 0
 #define POT_MAX ADC_MAX
+#define POT_MIN_SAFE (POT_MIN-SAFE_LIMIT)
+#define POT_MAX_SAFE (POT_MAX+SAFE_LIMIT)
 #define POT_WHITE_MIN 0
+#define POT_WHITE_MIN_SAFE POT_MIN_SAFE
 #define POT_WHITE_MAX 40
 #define POT_COLORS_MIN POT_WHITE_MAX+1
 #define POT_COLORS_MAX (POT_MAX/4)
@@ -544,6 +551,7 @@ SimplePatternList gPatterns = {
 #define EFFECTS_MAX (POT_MAX-40)
 #define DEMO_MIN (EFFECTS_MAX+1)
 #define DEMO_MAX POT_MAX
+#define DEMO_MAX_SAFE POT_MAX_SAFE
 #define EFFECTS_RANGE (EFFECTS_MAX-EFFECTS_MIN+1)
 #define EFFECTS_NUM ARRAY_SIZE(gPatterns)
 #define EFFECTS_STEP (EFFECTS_RANGE/EFFECTS_NUM)
@@ -611,7 +619,7 @@ void loop()
   }
 
   int value = getValue();
-  if (inRange(value, POT_WHITE_MIN, POT_WHITE_MAX)) {
+  if (inRange(value, POT_WHITE_MIN_SAFE, POT_WHITE_MAX)) {
     isSwitched(POT_WHITE_MIN);
     setAllLeds(CHSV(0, 0, 255));
   } else
@@ -630,7 +638,7 @@ void loop()
     EVERY_N_MILLISECONDS( 20 ) { gHue++; } // slowly cycle the "base color" through the rainbow
     gPatterns[effect]();
   } else
-  if (inRange(value, DEMO_MIN, DEMO_MAX)) {
+  if (inRange(value, DEMO_MIN, DEMO_MAX_SAFE)) {
     if (isSwitched(DEMO_MIN)) {
       gCurrentPatternNumber = 0;
       gHue = 0;
@@ -641,6 +649,8 @@ void loop()
     // do some periodic updates
     EVERY_N_MILLISECONDS( 20 ) { gHue++; } // slowly cycle the "base color" through the rainbow
     EVERY_N_SECONDS( 10 ) { nextPattern(); } // change patterns periodically    
+  } else {
+//    Serial.println(value);
   }
 
   // send the 'leds' array out to the actual LED strip
