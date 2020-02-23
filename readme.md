@@ -64,7 +64,7 @@ Primary firmware is in [firmware/ForestLamp](firmware/ForestLamp) folder.
 
 If internet control is not needed, there is an alternative firmware based on Arduino 328p. Effects are changed by pot (variable resistor).
 Please see it in [firmware/ForestLampNI](firmware/ForestLampNI) folder.
-
+Video: [https://youtu.be/wpEpOciEXpc](https://youtu.be/wpEpOciEXpc).
 
 ## TODO
 * Add videos
